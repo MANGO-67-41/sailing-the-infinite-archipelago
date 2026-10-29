@@ -18,8 +18,10 @@ extends Node3D
 ##
 ## The heavy maths runs on a WorkerThreadPool task; only creating the render and
 ## physics resources happens back on the main thread, so islands stream in
-## without hitches. Everything derives from island_seed, so the same seed always
-## gives the same island, name included.
+## without hitches. Where there are no threads (the web build), the same build
+## runs on the main thread instead, handing the frame back every SLICE_USEC so
+## it is spread over many frames. Everything derives from island_seed, so the
+## same seed always gives the same island, name included.
 
 signal generated
 
@@ -65,6 +67,8 @@ const LAMP_COLOUR := Color("ffb866")
 const CLEAR_GRID := 16.0
 ## A massive island's props are split into tiles this wide, so far ones can be culled.
 const PROP_TILE := 128.0
+## Without threads, how much of each frame island building may take, in total.
+const SLICE_USEC := 5000
 
 const FOLIAGE_KINDS: Array[StringName] = [&"broadleaf", &"pine", &"palm", &"grass"]
 
@@ -103,6 +107,12 @@ static var _foliage_material: ShaderMaterial
 static var _river_material: ShaderMaterial
 static var _lake_material: ShaderMaterial
 static var _beam_material: ShaderMaterial
+## The frame the building slice was last measured in, and when that slice began.
+static var _slice_frame := -1
+static var _slice_start := 0
+
+## True while a threadless build is under way (it has no task to wait on).
+var _sliced := false
 
 
 func configure(seed_value: int, island_radius: float, peak: float, is_great := false, is_massive := false) -> void:
@@ -134,7 +144,7 @@ func _exit_tree() -> void:
 
 ## Starts background generation; `generated` fires when the island is in place.
 func generate() -> void:
-	if _task_id != -1 or is_generated:
+	if _task_id != -1 or _sliced or is_generated:
 		return
 	_ensure_materials()
 	var params := {
@@ -145,7 +155,11 @@ func generate() -> void:
 		"great": great,
 		"massive": massive,
 	}
-	_task_id = WorkerThreadPool.add_task(_build.bind(params), false, "Island %d" % island_seed)
+	if OS.has_feature("threads"):
+		_task_id = WorkerThreadPool.add_task(_build.bind(params), false, "Island %d" % island_seed)
+	else:
+		_sliced = true
+		_build(params)
 
 
 ## Terrain height under a world position (sea level 0), or -INF off the mesh.
@@ -166,6 +180,19 @@ func get_discover_radius(padding: float) -> float:
 # =============================================================================
 # Worker thread: pure data, no scene or server access
 # =============================================================================
+
+## Without threads: waits for the next frame once this frame's building slice is
+## used up (shared by every island building at once). Does nothing on a worker.
+func _breathe() -> void:
+	if not _sliced:
+		return
+	var frame := Engine.get_process_frames()
+	if frame != _slice_frame:
+		_slice_frame = frame
+		_slice_start = Time.get_ticks_usec()
+	elif Time.get_ticks_usec() - _slice_start > SLICE_USEC:
+		await Engine.get_main_loop().process_frame
+
 
 func _build(params: Dictionary) -> void:
 	var seed_value: int = params["seed"]
@@ -210,6 +237,7 @@ func _build(params: Dictionary) -> void:
 	var heights := PackedFloat32Array()
 	heights.resize((n + 1) * (n + 1))
 	for j in n + 1:
+		await _breathe()
 		for i in n + 1:
 			var x := -extent + i * step
 			var z := -extent + j * step
@@ -225,6 +253,7 @@ func _build(params: Dictionary) -> void:
 	var bed := PackedByteArray()
 	bed.resize(heights.size())
 	var waters := {}
+	await _breathe()
 	if is_great:
 		waters = _carve_waters(heights, bed, n, step, extent, r, peak, seed_value)
 	elif is_massive:
@@ -234,6 +263,7 @@ func _build(params: Dictionary) -> void:
 	var ao := PackedFloat32Array()
 	ao.resize(heights.size())
 	for j in n + 1:
+		await _breathe()
 		for i in n + 1:
 			var h := heights[j * (n + 1) + i]
 			var sum := 0.0
@@ -252,6 +282,7 @@ func _build(params: Dictionary) -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var faces := PackedVector3Array()
 	for j in n:
+		await _breathe()
 		for i in n:
 			var i00 := j * (n + 1) + i
 			var i10 := i00 + 1
@@ -300,6 +331,7 @@ func _build(params: Dictionary) -> void:
 	var ruin_spots: Array[Vector3] = []
 	var lights: Array = []
 	var settled := {}
+	await _breathe()
 	if is_great:
 		settled = _settle(heights, n, step, extent, r, seed_value, waters, props, lights)
 	elif is_massive:
@@ -319,6 +351,7 @@ func _build(params: Dictionary) -> void:
 	var lush := 2.6 if is_massive else 1.0
 	var tree_line := peak * (0.3 if is_massive else 0.5)
 	for gz in cells:
+		await _breathe()
 		for gx in cells:
 			var x := -extent + (gx + rng.randf()) * spacing
 			var z := -extent + (gz + rng.randf()) * spacing
@@ -393,6 +426,7 @@ func _build(params: Dictionary) -> void:
 	if not big:
 		_place_beacon(heights, n, step, extent, peak, seed_value, props, lights)
 
+	await _breathe()
 	var river_arrays: Array = []
 	var lake_arrays: Array = []
 	var chart := {}
@@ -1000,10 +1034,13 @@ func _name_island(seed_value: int, r: float, props: Dictionary, with_ruins: bool
 # =============================================================================
 
 func _finish() -> void:
-	if _task_id == -1:
+	if _sliced:
+		_sliced = false
+	elif _task_id == -1:
 		return
-	WorkerThreadPool.wait_for_task_completion(_task_id)
-	_task_id = -1
+	else:
+		WorkerThreadPool.wait_for_task_completion(_task_id)
+		_task_id = -1
 	var data := _result
 	_result = {}
 	_apply(data)

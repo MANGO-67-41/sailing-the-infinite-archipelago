@@ -110,7 +110,9 @@ func _build() -> void:
 	_menu.add_item(&"discoveries", "DISCOVERIES", false, &"cairn").detail = \
 		("%d %s on your chart" % [found, "island" if found == 1 else "islands"]) if found > 0 else "Your chart, still blank"
 	_menu.add_item(&"settings", "SETTINGS", false, &"light")
-	_menu.add_item(&"quit", "QUIT", false, &"stack")
+	# A browser tab can't quit itself; closing the tab is the way out there.
+	if not OS.has_feature("web"):
+		_menu.add_item(&"quit", "QUIT", false, &"stack")
 	_menu.chosen.connect(_on_chosen)
 
 	var keys := CozyHUD.make_hbox(6)

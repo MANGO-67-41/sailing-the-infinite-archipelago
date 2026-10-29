@@ -131,7 +131,8 @@ func _process(delta: float) -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+	# In a browser the tab can close without warning, so leaving it saves too.
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or (what == NOTIFICATION_APPLICATION_FOCUS_OUT and OS.has_feature("web")):
 		save_voyage()
 
 

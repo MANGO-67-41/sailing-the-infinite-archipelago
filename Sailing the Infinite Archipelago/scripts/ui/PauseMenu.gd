@@ -120,7 +120,8 @@ func _build() -> void:
 	_menu.add_item(&"settings", "SETTINGS", false, &"light")
 	_menu.add_item(&"controls", "CONTROLS", false, &"palm")
 	_menu.add_item(&"title", "TITLE SCREEN", false, &"twin").detail = "Your voyage is saved"
-	_menu.add_item(&"quit", "QUIT", false, &"stack")
+	if not OS.has_feature("web"):
+		_menu.add_item(&"quit", "QUIT", false, &"stack")
 	_menu.chosen.connect(_on_chosen)
 
 	# Discoveries, Settings and Controls are full pages over the frozen sea.

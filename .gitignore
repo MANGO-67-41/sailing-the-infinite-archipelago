@@ -1,0 +1,15 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# macOS, leftover test scene
+.DS_Store
+/flow.tscn
+
+# Private notes and design tooling: not published
+.impeccable/
+PRODUCT.md
+DESIGN.md
+
+# Web export output
+build/

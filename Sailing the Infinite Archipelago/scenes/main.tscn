@@ -1,0 +1,86 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Shader" path="res://Sailing the Infinite Archipelago/assets/shaders/CozyOcean.gdshader" id="1_ocean"]
+[ext_resource type="PackedScene" path="res://Sailing the Infinite Archipelago/scenes/player_ship.tscn" id="2_ship"]
+[ext_resource type="PackedScene" path="res://Sailing the Infinite Archipelago/scenes/ui/CozyHUD.tscn" id="3_hud"]
+[ext_resource type="Script" path="res://Sailing the Infinite Archipelago/scripts/WorldManager.gd" id="4_world"]
+[ext_resource type="PackedScene" path="res://Sailing the Infinite Archipelago/scenes/ui/TitleScreen.tscn" id="5_title"]
+[ext_resource type="PackedScene" path="res://Sailing the Infinite Archipelago/scenes/ui/PauseMenu.tscn" id="6_pause"]
+[ext_resource type="Shader" path="res://Sailing the Infinite Archipelago/assets/shaders/CozySky.gdshader" id="7_sky"]
+[ext_resource type="Script" path="res://Sailing the Infinite Archipelago/scripts/DayNightCycle.gd" id="8_cycle"]
+
+[sub_resource type="ShaderMaterial" id="Sky_golden"]
+shader = ExtResource("7_sky")
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("Sky_golden")
+radiance_size = 1
+
+[sub_resource type="Environment" id="Env_golden"]
+background_mode = 2
+sky = SubResource("Sky_main")
+ambient_light_source = 3
+ambient_light_color = Color(1, 0.86, 0.74, 1)
+ambient_light_sky_contribution = 0.55
+ambient_light_energy = 0.9
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.45
+glow_bloom = 0.05
+fog_enabled = true
+fog_mode = 1
+fog_light_color = Color(0.98, 0.79, 0.64, 1)
+fog_sun_scatter = 0.35
+fog_density = 1.0
+fog_sky_affect = 0.45
+fog_depth_curve = 1.6
+fog_depth_begin = 60.0
+fog_depth_end = 300.0
+adjustment_enabled = true
+adjustment_saturation = 1.08
+
+[sub_resource type="PlaneMesh" id="Plane_ocean"]
+size = Vector2(640, 640)
+subdivide_width = 255
+subdivide_depth = 255
+
+[sub_resource type="ShaderMaterial" id="Mat_ocean"]
+render_priority = 0
+shader = ExtResource("1_ocean")
+shader_parameter/grid_snap = 2.5
+
+[node name="Main" type="Node3D"]
+script = ExtResource("4_world")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_golden")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.4226, 0.3686, -0.828, 0, 0.9135, 0.4067, 0.9063, 0.1719, -0.3861, 0, 30, 0)
+light_color = Color(1, 0.8, 0.58, 1)
+light_energy = 1.3
+shadow_enabled = true
+shadow_blur = 1.5
+directional_shadow_max_distance = 140.0
+
+[node name="Ocean" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+extra_cull_margin = 16384.0
+mesh = SubResource("Plane_ocean")
+surface_material_override/0 = SubResource("Mat_ocean")
+
+[node name="PlayerShip" parent="." instance=ExtResource("2_ship")]
+
+[node name="DayNight" type="Node" parent="."]
+script = ExtResource("8_cycle")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="CozyHUD" parent="UI" instance=ExtResource("3_hud")]
+
+[node name="Menus" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="TitleScreen" parent="Menus" instance=ExtResource("5_title")]
+
+[node name="PauseMenu" parent="Menus" instance=ExtResource("6_pause")]

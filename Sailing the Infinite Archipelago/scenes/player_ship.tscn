@@ -1,0 +1,30 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Sailing the Infinite Archipelago/scripts/ShipController.gd" id="1_ship"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hull"]
+size = Vector3(2.3, 1.8, 7.4)
+
+[node name="PlayerShip" type="CharacterBody3D"]
+motion_mode = 1
+script = ExtResource("1_ship")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, -0.35)
+shape = SubResource("BoxShape3D_hull")
+
+[node name="Model" type="Node3D" parent="."]
+
+[node name="CameraPivot" type="Node3D" parent="."]
+top_level = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4, 0)
+
+[node name="CameraPitch" type="Node3D" parent="CameraPivot"]
+transform = Transform3D(1, 0, 0, 0, 0.956305, 0.292372, 0, -0.292372, 0.956305, 0, 0, 0)
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot/CameraPitch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 16)
+current = true
+fov = 55.0
+near = 0.1
+far = 700.0
